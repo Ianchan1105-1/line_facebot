@@ -1,2 +1,4 @@
 flask
 line-bot-sdk==2.4.1
+requests
+aiohttp
