@@ -1,4 +1,4 @@
-flask
+Flask==2.2.5
 line-bot-sdk==2.4.1
-aiohttp==3.8.3
-requests
+aiohttp==3.8.1
+requests==2.31.0
