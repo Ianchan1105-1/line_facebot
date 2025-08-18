@@ -1,55 +1,63 @@
-# app.py：Render 雲端部署用
+import os
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
-from linebot.models import JoinEvent, TextSendMessage
-import os
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
-# === LINE 設定 ===
-LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
-LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
-GROUP_FILE = "groups.txt"
+# ✅ 讀取環境變數
+channel_access_token = os.getenv("LINE_TOKEN")
+channel_secret = os.getenv("LINE_CHANNEL_SECRET")  # 如果你有設定這個
+line_user_id = os.getenv("LINE_USER_ID")
+imgbb_api_key = os.getenv("IMGBB_API_KEY")
 
-line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
-handler = WebhookHandler(LINE_CHANNEL_SECRET)
+# ✅ 檢查環境變數是否成功讀取
+if not channel_access_token:
+    raise ValueError("環境變數 LINE_TOKEN 未設定")
+if not line_user_id:
+    raise ValueError("環境變數 LINE_USER_ID 未設定")
+if not imgbb_api_key:
+    raise ValueError("環境變數 IMGBB_API_KEY 未設定")
+# channel_secret 如果沒用到可以不用強制檢查
 
-# === 初始化 Flask App ===
+# 初始化 Flask App
 app = Flask(__name__)
 
-# === 初始化群組記錄檔 ===
-if not os.path.exists(GROUP_FILE):
-    open(GROUP_FILE, "w", encoding="utf-8").close()
+# 初始化 Line Bot API
+line_bot_api = LineBotApi(channel_access_token)
+# 如果你有用 Webhook Handler，取消註解下面這行
+# handler = WebhookHandler(channel_secret)
 
-# === 群組 ID 記錄函式 ===
-def add_group(group_id):
-    with open(GROUP_FILE, "r", encoding="utf-8") as f:
-        if group_id not in f.read().splitlines():
-            with open(GROUP_FILE, "a", encoding="utf-8") as fw:
-                fw.write(group_id + "\n")
-            print("✅ 已加入群組 ID：", group_id)
+# === 測試用路由 ===
+@app.route('/')
+def index():
+    return 'Line Bot Webhook Server 正常運作中'
 
-# === Webhook 主程式 ===
-@app.route("/", methods=['POST'])
+# === LINE Webhook 接收路由 ===
+@app.route('/callback', methods=['POST'])
 def callback():
-    signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
     try:
-        handler.handle(body, signature)
+        json_data = request.get_json()
+        print("接收到訊息：", json_data)
+
+        # 取得使用者傳來的文字訊息
+        events = json_data['events']
+        for event in events:
+            if event['type'] == 'message':
+                message_text = event['message']['text']
+                reply_token = event['replyToken']
+                line_bot_api.reply_message(
+                    reply_token,
+                    TextSendMessage(text=f"你說的是：{message_text}")
+                )
+
     except Exception as e:
-        print("❌ Webhook 處理錯誤：", e)
+        print("Webhook 接收錯誤：", e)
         abort(400)
+
     return 'OK'
 
-# === 處理群組加入事件 ===
-@handler.add(JoinEvent)
-def handle_join(event):
-    gid = event.source.group_id or event.source.room_id
-    if gid:
-        add_group(gid)
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text="✅ 我已成功加入群組！請稍後開始辨識推播。")
-        )
-
-# === 執行 app（本地測試用）===
+# === 主程式入口點 ===
 if __name__ == "__main__":
-    app.run(port=5000)
+    port = int(os.environ.get("PORT", 5000))  # Render 預設用 PORT
+    app.run(host='0.0.0.0', port=port)
