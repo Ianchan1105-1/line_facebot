@@ -1,0 +1,16 @@
+
+# 忽略模型檔與資料庫
+keras_model.h5
+face_log.sqlite
+
+# 忽略 LINE 群組 ID 記錄檔
+groups.txt
+
+# 忽略 Python 暫存資料
+__pycache__/
+*.pyc
+
+# 忽略 VSCode、Spyder 等 IDE 設定檔（如有）
+.vscode/
+.spyderproject
+.spyproject
